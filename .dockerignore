@@ -1,0 +1,18 @@
+# Environnement local / venv (rebuild dans l'image, ne pas copier l'hôte)
+.venv
+.uv-cache
+.ruff_cache
+
+# Caches Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Git & outillage
+.git
+.gitignore
+.github
+.claude
+
+# OS
+.DS_Store

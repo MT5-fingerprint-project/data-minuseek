@@ -1,29 +1,31 @@
-# dacty data repository
+# data-minuseek
 
-Dacty data service.
+Minuseek data service.
+
+A `Makefile` wraps the most common commands. Run `make help` to list them.
 
 ## Setup
 
 ```bash
-uv sync
+make sync   # or: uv sync
 ```
 
 ## Run
 
 ```bash
-uv run uvicorn src.main:app --reload
+make dev    # or: uv run uvicorn src.main:app --reload
 ```
 
 Without auto-reload:
 
 ```bash
-uv run uvicorn src.main:app
+make run    # or: uv run uvicorn src.main:app
 ```
 
 ## Lint
 
 ```bash
-uv run ruff check .
+make lint   # or: uv run ruff check .
 ```
 
 ## Conventions

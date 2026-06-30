@@ -1,5 +1,5 @@
 [project]
-name = "data-dacty"
+name = "data-minuseek"
 version = "0.1.0"
 description = "Minimal FastAPI skeleton for Fingerprint data services"
 readme = "README.md"
