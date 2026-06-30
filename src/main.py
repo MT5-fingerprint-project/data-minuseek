@@ -1,16 +1,21 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-
-APP_NAME = "data-dacty"
-APP_VERSION = "0.1.0"
-
-app = FastAPI(title=APP_NAME, version=APP_VERSION)
+from src.config import APP_NAME, APP_VERSION
+from src.routers import compare, health
+from src.services.sourceafis import SourceAfisEngine
 
 
-@app.get("/health")
-def healthcheck() -> dict[str, str]:
-    return {
-        "status": "ok",
-        "service": APP_NAME,
-        "version": APP_VERSION,
-    }
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # JPype's embedded JVM cannot be cleanly restarted once shut down, so we
+    # start it once here and let it go away with the process (no shutdown call).
+    app.state.sourceafis = SourceAfisEngine()
+    yield
+
+
+app = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
+
+app.include_router(health.router)
+app.include_router(compare.router)

@@ -9,4 +9,6 @@ services:
       - .:/app
       # Garde le venv construit dans l'image (ne pas écraser avec l'hôte)
       - /app/.venv
+      # Garde les jars SourceAFIS construits dans l'image (ne pas écraser avec l'hôte)
+      - /app/build
     command: uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
