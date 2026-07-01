@@ -1,0 +1,17 @@
+FROM ghcr.io/astral-sh/uv:python3.9-bookworm-slim
+
+WORKDIR /app
+ENV UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
+
+RUN groupadd --system app && useradd --system --gid app --home-dir /app app
+
+COPY pyproject.toml uv.lock README.md .python-version ./
+RUN uv sync --frozen --no-dev
+
+COPY . .
+RUN chown -R app:app /app
+USER app
+
+EXPOSE 8080
+CMD ["sh", "-c", ".venv/bin/uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
