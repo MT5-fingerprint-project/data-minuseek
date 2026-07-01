@@ -1,6 +1,8 @@
-# dacty data repository
+# data-minuseek
 
-Dacty data service.
+Minuseek data service.
+
+A `Makefile` wraps the most common commands. Run `make help` to list them.
 
 A `Makefile` wraps the most common commands. Run `make help` to list them.
 
