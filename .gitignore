@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Claude Code : on ignore les réglages perso (settings.local.json),
+# mais on partage le symlink skills -> ../.agents/skills (source de vérité unique)
+.claude/*
+!.claude/skills
