@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.config import APP_NAME, APP_VERSION
+from fastapi.routing import APIRouter
+
 from src.routers import compare, health
 from src.services.sourceafis import SourceAfisEngine
 
@@ -17,5 +19,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
 
-app.include_router(health.router)
-app.include_router(compare.router)
+api_router = APIRouter(prefix="/data/api")
+api_router.include_router(health.router)
+api_router.include_router(compare.router)
+
+app.include_router(api_router)

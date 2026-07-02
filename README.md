@@ -35,7 +35,7 @@ make lint   # or: uv run ruff check .
 Compares a trace fingerprint against one or more reference fingerprints using [SourceAFIS](https://github.com/robertvazan/sourceafis-java) (1:N search) and returns the best-scoring candidates, sorted descending.
 
 ```bash
-curl -X POST "http://localhost:8000/compare?top=10&threshold=40" \
+curl -X POST "http://localhost:8000/api/compare?top=10&threshold=40" \
   -F "trace=@trace.png" \
   -F "reference_prints=@reference1.png" \
   -F "reference_prints=@reference2.png"
