@@ -21,13 +21,19 @@ class SourceAfisEngine:
 
         from com.machinezoo.sourceafis import (
             FingerprintImage,
+            FingerprintImageOptions,
             FingerprintMatcher,
             FingerprintTemplate,
         )
 
         self._image = FingerprintImage
+        self._image_options = FingerprintImageOptions
         self._matcher = FingerprintMatcher
         self._template = FingerprintTemplate
+
+    def _make_template(self, image_bytes: bytes, dpi: int) -> object:
+        options = self._image_options().dpi(dpi)
+        return self._template(self._image(image_bytes, options))
 
     def search(
         self,
@@ -35,16 +41,17 @@ class SourceAfisEngine:
         reference_prints: list[tuple[str, bytes]],
         top: int,
         threshold: float,
+        dpi: int = 500,
     ) -> list[dict]:
         """Compare a trace against many reference prints, best matches first."""
-        trace_template = self._template(self._image(trace_bytes))
+        trace_template = self._make_template(trace_bytes, dpi)
         matcher = self._matcher(trace_template)
 
         results = []
         for name, data in reference_prints:
-            reference_template = self._template(self._image(data))
+            reference_template = self._make_template(data, dpi)
             score = float(matcher.match(reference_template))
-            results.append({"reference_print": name, "score": score, "match": score >= threshold})
+            results.append({"reference_print": name.split(".")[0], "score": score, "match": score >= threshold})
 
         results.sort(key=lambda result: result["score"], reverse=True)
         return results[:top]
