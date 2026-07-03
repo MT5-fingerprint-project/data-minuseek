@@ -1,0 +1,47 @@
+# Déploiement PROD : déclenché par un tag v*. AUCUN rebuild — copie du digest
+# déjà buildé pour ce commit depuis l'AR dev (build-once). Échoue explicitement
+# si l'image du commit taggé n'existe pas en dev.
+# ⚠️ Inerte tant que la prod est au repos : nécessite GCP_SA_KEY_PROD,
+name: deploy-prod
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency: deploy-prod
+
+env:
+  REGION: europe-west1
+  PROJECT: prod-minuseek
+  AR_DEV: europe-west1-docker.pkg.dev/dev-minuseek/minuseek
+  AR_PROD: europe-west1-docker.pkg.dev/prod-minuseek/minuseek
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: imjasonh/setup-crane@v0.4
+
+      - name: Copy digest dev -> prod (no rebuild)
+        run: |
+          crane auth login europe-west1-docker.pkg.dev \
+            -u oauth2accesstoken -p "$(gcloud auth print-access-token)"
+          crane copy "$AR_DEV/data:${{ steps.sha.outputs.short }}" \
+                     "$AR_PROD/data:${{ steps.sha.outputs.short }}"
+
+      - name: Deploy Cloud Run
+        run: |
+          gcloud run deploy minuseek-data \
+            --image="$AR_PROD/data:${{ steps.sha.outputs.short }}" \
+            --region="$REGION" --project="$PROJECT" --quiet

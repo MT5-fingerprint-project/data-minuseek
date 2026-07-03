@@ -1,0 +1,42 @@
+# Déploiement continu DEV : chaque merge sur main build, pousse et déploie
+# l'image data. Secret requis : GCP_SA_KEY_DEV .
+name: deploy-dev
+
+on:
+  push:
+    branches: [main]
+
+concurrency: deploy-dev
+
+env:
+  REGION: europe-west1
+  PROJECT: dev-minuseek
+  AR: europe-west1-docker.pkg.dev/dev-minuseek/minuseek
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY_DEV }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+      - name: Build and push image
+        run: |
+          docker build -f Dockerfile.prod -t "$AR/data:${{ steps.sha.outputs.short }}" .
+          docker push "$AR/data:${{ steps.sha.outputs.short }}"
+
+      - name: Deploy Cloud Run
+        run: |
+          gcloud run deploy minuseek-data \
+            --image="$AR/data:${{ steps.sha.outputs.short }}" \
+            --region="$REGION" --project="$PROJECT" --quiet
