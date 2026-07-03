@@ -11,9 +11,12 @@ services:
       - /app/.venv
       # Garde les jars SourceAFIS construits dans l'image (ne pas écraser avec l'hôte)
       - /app/build
+      # ADC keyless (impersonation back-runtime@dev-minuseek), cf. ADR-0003 du back
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
     command: uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
-      - S3_API_URL=http://app:3000/media
+      - GCS_BUCKET=minuseek-media-dev
+      - GCP_PROJECT=dev-minuseek
     networks:
       - default
       - minuseek

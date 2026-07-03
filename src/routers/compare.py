@@ -1,11 +1,12 @@
 import logging
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from google.cloud import storage
+from google.cloud.exceptions import NotFound
 from pydantic import BaseModel
 
-from src.config import S3_API_URL
+from src.config import GCP_PROJECT, GCS_BUCKET
 from src.schemas import SearchCandidate, SearchResponse
 from src.services.sourceafis import SourceAfisEngine, get_sourceafis_engine
 
@@ -15,6 +16,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_MATCH_THRESHOLD = 40.0
 
 router = APIRouter()
+
+_storage_client = storage.Client(project=GCP_PROJECT)
 
 
 class CompareRequest(BaseModel):
@@ -26,18 +29,18 @@ class CompareRequest(BaseModel):
 
 
 def _fetch_image(case_id: str, folder: str, image_id: str) -> tuple[str, bytes]:
-    """Fetch an image from the main backend storage via HTTP."""
-    # The main backend stores files at: media/investigation-case/{caseId}/{folder}/{id}.*
-    # It serves them as static assets under /media/...
-    # We list and find the file by its ID prefix (extension unknown at this point)
-    base_url = f"{S3_API_URL}/investigation-case/{case_id}/{folder}"
+    """Fetch an image directly from the GCS bucket the back writes to."""
+    # The back stores objects at: media/investigation-case/{caseId}/{folder}/{id}.*
+    # (same object-key convention as the back's ImageStoragePort, cf. ADR-0002/0003).
+    bucket = _storage_client.bucket(GCS_BUCKET)
+    base_key = f"media/investigation-case/{case_id}/{folder}/{image_id}"
 
     for ext in (".png", ".jpg", ".jpeg", ".tiff", ".tif"):
-        url = f"{base_url}/{image_id}{ext}"
-        with httpx.Client() as client:
-            response = client.get(url)
-            if response.status_code == 200:
-                return (f"{image_id}{ext}", response.content)
+        blob = bucket.blob(f"{base_key}{ext}")
+        try:
+            return (f"{image_id}{ext}", blob.download_as_bytes())
+        except NotFound:
+            continue
 
     raise HTTPException(
         status_code=404,

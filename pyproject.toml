@@ -10,6 +10,7 @@ dependencies = [
     "jpype1",
     "python-multipart",
     "httpx",
+    "google-cloud-storage>=3.9.0",
 ]
 
 [dependency-groups]
