@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import Annotated
 
@@ -28,10 +30,8 @@ class CompareRequest(BaseModel):
     threshold: float = DEFAULT_MATCH_THRESHOLD
 
 
-def _fetch_image(case_id: str, folder: str, image_id: str) -> tuple[str, bytes]:
-    """Fetch an image directly from the GCS bucket the back writes to."""
-    # The back stores objects at: media/investigation-case/{caseId}/{folder}/{id}.*
-    # (same object-key convention as the back's ImageStoragePort, cf. ADR-0002/0003).
+def _fetch_image(case_id: str, folder: str, image_id: str) -> tuple[str, bytes] | None:
+    """Fetch an image directly from the GCS bucket"""
     bucket = _storage_client.bucket(GCS_BUCKET)
     base_key = f"media/investigation-case/{case_id}/{folder}/{image_id}"
 
@@ -42,10 +42,8 @@ def _fetch_image(case_id: str, folder: str, image_id: str) -> tuple[str, bytes]:
         except NotFound:
             continue
 
-    raise HTTPException(
-        status_code=404,
-        detail=f"Image {image_id} not found in case {case_id}/{folder}",
-    )
+    logger.warning("Image %s not found in case %s/%s, skipping it", image_id, case_id, folder)
+    return None
 
 
 @router.post("/compare")
@@ -54,16 +52,20 @@ def compare(
     engine: Annotated[SourceAfisEngine, Depends(get_sourceafis_engine)],
 ) -> SearchResponse:
     try:
-        trace_name, trace_bytes = _fetch_image(body.case_id, "traces", body.trace_id)
+        trace = _fetch_image(body.case_id, "traces", body.trace_id)
         references = [
-            _fetch_image(body.case_id, "reference-prints", ref_id)
+            image
             for ref_id in body.reference_print_ids
+            if (image := _fetch_image(body.case_id, "reference-prints", ref_id)) is not None
         ]
-    except HTTPException:
-        raise
     except Exception:
         logger.exception("Failed to fetch fingerprint images")
         raise HTTPException(status_code=502, detail="Could not fetch fingerprint images") from None
+
+    if trace is None or not references:
+        return SearchResponse(results=[])
+
+    _, trace_bytes = trace
 
     try:
         results = engine.search(trace_bytes, references, body.top, body.threshold)
