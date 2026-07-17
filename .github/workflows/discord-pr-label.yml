@@ -1,0 +1,44 @@
+name: Notify Discord on "ready for review"
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  notify:
+    if: github.event.label.name == 'ready-to-review'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "username": "GitHub",
+                 "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                 "embeds": [{
+                   "title": "🔍 PR prête pour review",
+                   "description": "**[${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})**",
+                   "color": 5025616,
+                   "fields": [
+                     {
+                       "name": "Auteur",
+                       "value": "${{ github.event.pull_request.user.login }}",
+                       "inline": true
+                     },
+                     {
+                       "name": "Repo",
+                       "value": "${{ github.repository }}",
+                       "inline": true
+                     },
+                     {
+                       "name": "Branch",
+                       "value": "`${{ github.event.pull_request.head.ref }}` → `${{ github.event.pull_request.base.ref }}`"
+                     }
+                   ]
+                 }]
+               }' \
+               "$DISCORD_WEBHOOK_URL"
