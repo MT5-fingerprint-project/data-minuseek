@@ -40,7 +40,6 @@ class SourceAfisEngine:
         trace_bytes: bytes,
         reference_prints: list[tuple[str, bytes]],
         top: int,
-        threshold: float,
         dpi: int = 500,
     ) -> list[dict]:
         """Compare a trace against many reference prints, best matches first."""
@@ -51,7 +50,7 @@ class SourceAfisEngine:
         for name, data in reference_prints:
             reference_template = self._make_template(data, dpi)
             score = float(matcher.match(reference_template))
-            results.append({"reference_print": name.split(".")[0], "score": score, "match": score >= threshold})
+            results.append({"reference_print": name.split(".")[0], "score": score})
 
         results.sort(key=lambda result: result["score"], reverse=True)
         return results[:top]

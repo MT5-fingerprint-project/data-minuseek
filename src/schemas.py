@@ -10,7 +10,6 @@ class HealthResponse(BaseModel):
 class SearchCandidate(BaseModel):
     reference_print: str
     score: float
-    match: bool
 
 
 class SearchResponse(BaseModel):
