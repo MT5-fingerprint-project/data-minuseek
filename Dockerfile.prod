@@ -1,8 +1,25 @@
+# --- Stage 1 : build des jars SourceAFIS via Maven ---
+# Le moteur de matching est la lib Java SourceAFIS, appelée depuis Python par
+# JPype. maven-dependency-plugin (java/sourceafis/pom.xml) copie SourceAFIS +
+# ses dépendances dans ${project.basedir}/jars → ici /build/jars.
+FROM maven:3.9-eclipse-temurin-17 AS jars
+WORKDIR /build
+COPY java/sourceafis/pom.xml ./pom.xml
+RUN mvn -q -B -f pom.xml package
+
+# --- Stage 2 : runtime FastAPI (Python + JRE pour la JVM JPype) ---
 FROM ghcr.io/astral-sh/uv:python3.9-bookworm-slim
 
 WORKDIR /app
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1
+
+# JRE headless : JPype démarre une JVM embarquée au boot (SourceAfisEngine).
+# JAVA_HOME aide JPype à localiser libjvm sans auto-détection fragile.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/usr/lib/jvm/default-java
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
@@ -10,6 +27,11 @@ COPY pyproject.toml uv.lock README.md .python-version ./
 RUN uv sync --frozen --no-dev
 
 COPY . .
+
+# Jars buildés au stage Maven → chemin attendu par config.py
+# (SOURCEAFIS_JARS_DIR, défaut /app/build/jars).
+COPY --from=jars /build/jars /app/build/jars
+
 RUN chown -R app:app /app
 USER app
 
