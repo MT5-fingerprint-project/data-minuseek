@@ -9,9 +9,14 @@ from src.config import JARS_DIR
 # Template extraction dominates the cost of a comparison (tens of seconds per
 # high-resolution photo) and is single-threaded inside SourceAFIS, so the
 # engine extracts the trace and reference templates concurrently in the JVM
-# (JPype releases the GIL during Java calls). Bounded to stay within the
-# container CPU and JVM heap budget.
+# (JPype releases the GIL during Java calls).
+#
+# The pool is shared by ALL requests: extraction of a 12MP photo transiently
+# allocates hundreds of MB of JVM heap, so the number of concurrent
+# extractions service-wide must stay bounded or the JVM OOMs (observed with
+# Xmx3g). Size the heap for _TEMPLATE_WORKERS concurrent extractions.
 _TEMPLATE_WORKERS = 4
+_template_pool = ThreadPoolExecutor(max_workers=_TEMPLATE_WORKERS)
 
 
 class SourceAfisEngine:
@@ -52,18 +57,17 @@ class SourceAfisEngine:
         dpi: int = 500,
     ) -> list[dict]:
         """Compare a trace against many reference prints, best matches first."""
-        with ThreadPoolExecutor(max_workers=_TEMPLATE_WORKERS) as executor:
-            trace_future = executor.submit(self._make_template, trace_bytes, dpi)
-            reference_futures = [
-                (name, executor.submit(self._make_template, data, dpi))
-                for name, data in reference_prints
-            ]
-            matcher = self._matcher(trace_future.result())
+        trace_future = _template_pool.submit(self._make_template, trace_bytes, dpi)
+        reference_futures = [
+            (name, _template_pool.submit(self._make_template, data, dpi))
+            for name, data in reference_prints
+        ]
+        matcher = self._matcher(trace_future.result())
 
-            results = []
-            for name, reference_future in reference_futures:
-                score = float(matcher.match(reference_future.result()))
-                results.append({"reference_print": name.split(".")[0], "score": score})
+        results = []
+        for name, reference_future in reference_futures:
+            score = float(matcher.match(reference_future.result()))
+            results.append({"reference_print": name.split(".")[0], "score": score})
 
         results.sort(key=lambda result: result["score"], reverse=True)
         return results[:top]
