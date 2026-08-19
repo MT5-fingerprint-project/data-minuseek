@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.config import ENGINE_VERSION
 from src.repositories.image_repository import ImageStorageError
 from src.schemas import SearchCandidate, SearchResponse
 from src.services.comparison import (
@@ -40,4 +41,7 @@ def compare(
     except ComparisonFailedError:
         raise HTTPException(status_code=400, detail="Could not compare fingerprints") from None
 
-    return SearchResponse(results=[SearchCandidate(**result) for result in results])
+    return SearchResponse(
+        results=[SearchCandidate(**result) for result in results],
+        engine_version=ENGINE_VERSION,
+    )

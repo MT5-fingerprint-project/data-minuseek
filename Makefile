@@ -1,6 +1,6 @@
 COMPOSE = docker compose -f compose.yaml
 
-.PHONY: help dev run down logs lint
+.PHONY: help dev run down logs lint test
 
 help:
 	@echo "Available targets:"
@@ -9,6 +9,7 @@ help:
 	@echo "  make down  - Stop the data service"
 	@echo "  make logs  - Follow the data service logs"
 	@echo "  make lint  - Run ruff inside the container"
+	@echo "  make test  - Run pytest inside the container"
 
 ## Lance la data en mode dev avec hot-reload (premier plan), sur http://localhost:8000
 dev:
@@ -29,3 +30,7 @@ logs:
 ## Lance le linter (ruff) dans le conteneur
 lint:
 	$(COMPOSE) run --rm data uv run ruff check .
+
+## Lance les tests (pytest) dans le conteneur
+test:
+	$(COMPOSE) run --rm data uv run pytest
