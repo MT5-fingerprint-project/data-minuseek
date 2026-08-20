@@ -5,6 +5,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    engine_version: str
 
 
 class SearchCandidate(BaseModel):
@@ -14,3 +15,4 @@ class SearchCandidate(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[SearchCandidate]
+    engine_version: str

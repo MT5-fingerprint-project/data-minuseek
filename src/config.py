@@ -6,6 +6,13 @@ APP_VERSION = "0.1.0"
 
 JARS_DIR = Path(os.environ.get("SOURCEAFIS_JARS_DIR", "/app/build/jars"))
 
+# Version du moteur de comparaison, indépendante d'APP_VERSION : elle change
+# quand SourceAFIS ou son paramétrage change, pas quand le service évolue. Un
+# rapport probant cite cette valeur pour dire quel algorithme a produit un score.
+SOURCEAFIS_VERSION = "3.17.1"
+ENGINE_PARAMETERIZATION = "1"
+ENGINE_VERSION = f"sourceafis-{SOURCEAFIS_VERSION}+minuseek.{ENGINE_PARAMETERIZATION}"
+
 
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
