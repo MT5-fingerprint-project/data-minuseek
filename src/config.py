@@ -13,6 +13,23 @@ SOURCEAFIS_VERSION = "3.17.1"
 ENGINE_PARAMETERIZATION = "1"
 ENGINE_VERSION = f"sourceafis-{SOURCEAFIS_VERSION}+minuseek.{ENGINE_PARAMETERIZATION}"
 
+# Version du détecteur de règle millimétrée, même logique qu'ENGINE_VERSION :
+# elle change quand l'algorithme ou sa calibration (seuil, paramètres) change,
+# pas quand le service évolue. Le back la trace dans l'audit de chaque upload.
+RULER_DETECTOR_ALGORITHM = "periodicity"
+RULER_DETECTOR_CALIBRATION = "0"  # 0 = seuil provisoire, non calibré sur photos réelles
+RULER_DETECTOR_VERSION = f"ruler-{RULER_DETECTOR_ALGORITHM}-1.0+cal.{RULER_DETECTOR_CALIBRATION}"
+
+# Seuil de confiance au-dessus duquel la règle est déclarée présente. Surchargeable
+# par env pour la calibration ; la valeur par défaut est celle du prototype.
+RULER_CONFIDENCE_THRESHOLD = float(os.environ.get("RULER_CONFIDENCE_THRESHOLD", "0.4"))
+
+# Taille maximale acceptée pour une image envoyée en multipart (alignée sur le back),
+# et nombre de pixels maximal une fois décodée (≈ 4× une photo mobile de 12 MP) :
+# borne la mémoire quelle que soit la compression du fichier reçu.
+MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024
+MAX_IMAGE_PIXELS = 50_000_000
+
 
 def _require_env(name: str) -> str:
     value = os.environ.get(name)

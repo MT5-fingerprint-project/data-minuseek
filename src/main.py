@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from src.config import APP_NAME, APP_VERSION
 from fastapi.routing import APIRouter
 
-from src.routers import compare, health
+from src.routers import compare, detect_ruler, health
 from src.services.sourceafis import SourceAfisEngine
 
 
@@ -22,5 +22,6 @@ app = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
 api_router = APIRouter(prefix="/data/api")
 api_router.include_router(health.router)
 api_router.include_router(compare.router)
+api_router.include_router(detect_ruler.router)
 
 app.include_router(api_router)

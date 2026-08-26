@@ -9,4 +9,4 @@ On consigne ici les **décisions structurantes** du repo : choix techno, trade-o
 - Les agents IA créent un ADR quand ils prennent ou proposent une telle décision (cf. « Directives agents » dans `AGENTS.md`).
 
 ## Index
-- _(à compléter au fil des ADR)_
+- [ADR-0001](0001-detect-ruler-contrat-octets-algo-periodicite.md) — `POST /data/api/detect-ruler` : contrat par octets, détection classique par périodicité des graduations

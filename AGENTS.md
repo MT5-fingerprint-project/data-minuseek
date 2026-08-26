@@ -27,7 +27,8 @@ Service data du projet Minuseek — **Python + FastAPI**, en **DDD / architectur
 - **Runtime** : Python ≥ 3.9 (`.python-version` = `3.9`, `requires-python = ">=3.9"`) — **Package manager** : [uv](https://docs.astral.sh/uv/) (`uv.lock` committé).
 - **Framework** : FastAPI servi par **uvicorn** (`uvicorn[standard]`). Pydantic (transitif via FastAPI, API v2 : `ConfigDict`, `Field`) sert uniquement aux schémas HTTP — **validation à la frontière HTTP uniquement**.
 - **Lint** : ruff (groupe de dépendances `dev`). **Conteneurs** : Docker Compose (`docker compose up --build`) avec hot-reload (`--reload`).
-- **Tests** : *aucun pour l'instant* (voir la section Tests).
+- **Tests** : pytest (`make test` dans le conteneur ; hors Docker `STORAGE_EMULATOR_HOST=http://localhost:9 uv run pytest`, cf. README). Images synthétiques dans `tests/synthetic_images.py` — jamais de photos de traces réelles dans le repo.
+- **Vision** : `numpy` + `opencv-python-headless` (détection de règle, `src/services/ruler_detection.py`).
 
 ## Démarrage
 
@@ -55,7 +56,9 @@ L'API écoute sur `http://localhost:8000` (port fixé dans `compose.yaml` et le 
 
 ## Architecture — où va le code
 
-Comme le back, le service suit une **architecture hexagonale (ports & adapters) / DDD**. Chaque *bounded context* est un dossier sous `src/` (aujourd'hui : `comparison/`), découpé en 3 couches :
+> ⚠️ **État réel du code (2026-08)** : le découpage par bounded context ci-dessous est la **cible** ; l'implémentation actuelle est à plat — `src/routers/` (FastAPI, validation, DI), `src/services/` (logique sans FastAPI : `sourceafis.py`, `comparison.py`, `ruler_detection.py`), `src/repositories/` (GCS), `src/schemas.py`, `src/config.py`. Le squelette `src/comparison/` a été supprimé (commit `d855153`) car il ne reflétait pas le code. Les principes (services sans framework, validation à la frontière, DI par `Depends`) s'appliquent tels quels.
+
+Comme le back, le service suit une **architecture hexagonale (ports & adapters) / DDD**. Chaque *bounded context* est un dossier sous `src/`, découpé en 3 couches :
 
 ```
 src/comparison/
