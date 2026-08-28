@@ -1,10 +1,15 @@
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 
 import jpype
 import jpype.imports
 from fastapi import Request
 
 from src.config import JARS_DIR
+
+logger = logging.getLogger(__name__)
 
 # Template extraction dominates the cost of a comparison (tens of seconds per
 # high-resolution photo) and is single-threaded inside SourceAFIS, so the
@@ -17,6 +22,22 @@ from src.config import JARS_DIR
 # Xmx3g). Size the heap for _TEMPLATE_WORKERS concurrent extractions.
 _TEMPLATE_WORKERS = 4
 _template_pool = ThreadPoolExecutor(max_workers=_TEMPLATE_WORKERS)
+
+
+@dataclass(frozen=True)
+class SearchTimings:
+    """Durées d'une recherche, pour savoir où porter l'effort d'optimisation.
+
+    `extraction_seconds` est mesuré à l'intérieur des threads du pool : sa somme
+    dépasse `total_seconds` quand les extractions se recouvrent, et le rapport
+    entre les deux donne le parallélisme réellement obtenu. Son maximum est le
+    plancher qu'aucun ajout de vCPU ne fera descendre, une extraction seule
+    étant mono-thread dans SourceAFIS.
+    """
+
+    extraction_seconds: list[float]
+    matching_seconds: float
+    total_seconds: float
 
 
 class SourceAfisEngine:
@@ -45,9 +66,23 @@ class SourceAfisEngine:
         self._matcher = FingerprintMatcher
         self._template = FingerprintTemplate
 
-    def _make_template(self, image_bytes: bytes, dpi: int) -> object:
+        # La JVM lit les vCPU et le heap dans les limites du conteneur : ce que
+        # Cloud Run alloue et ce que SourceAFIS peut réellement utiliser ne se
+        # déduisent pas du Terraform. JClass plutôt qu'un `import java.lang` :
+        # le système d'import de JPype n'expose pas les modules du JDK.
+        runtime = jpype.JClass("java.lang.Runtime").getRuntime()
+        logger.info(
+            "sourceafis engine ready processors=%d max_heap=%.1fGB extraction_workers=%d",
+            runtime.availableProcessors(),
+            runtime.maxMemory() / 1_000_000_000,
+            _TEMPLATE_WORKERS,
+        )
+
+    def _make_template(self, image_bytes: bytes, dpi: int) -> tuple[object, float]:
+        started = time.perf_counter()
         options = self._image_options().dpi(dpi)
-        return self._template(self._image(image_bytes, options))
+        template = self._template(self._image(image_bytes, options))
+        return template, time.perf_counter() - started
 
     def search(
         self,
@@ -55,22 +90,40 @@ class SourceAfisEngine:
         reference_prints: list[tuple[str, bytes]],
         top: int,
         dpi: int = 500,
-    ) -> list[dict]:
+    ) -> tuple[list[dict], SearchTimings]:
         """Compare a trace against many reference prints, best matches first."""
+        started = time.perf_counter()
+
         trace_future = _template_pool.submit(self._make_template, trace_bytes, dpi)
         reference_futures = [
             (name, _template_pool.submit(self._make_template, data, dpi))
             for name, data in reference_prints
         ]
-        matcher = self._matcher(trace_future.result())
 
+        trace_template, trace_extraction_seconds = trace_future.result()
+        matcher = self._matcher(trace_template)
+
+        extraction_seconds = [trace_extraction_seconds]
+        matching_seconds = 0.0
         results = []
         for name, reference_future in reference_futures:
-            score = float(matcher.match(reference_future.result()))
+            reference_template, reference_extraction_seconds = reference_future.result()
+            extraction_seconds.append(reference_extraction_seconds)
+
+            matching_started = time.perf_counter()
+            score = float(matcher.match(reference_template))
+            matching_seconds += time.perf_counter() - matching_started
+
             results.append({"reference_print": name.split(".")[0], "score": score})
 
         results.sort(key=lambda result: result["score"], reverse=True)
-        return results[:top]
+
+        timings = SearchTimings(
+            extraction_seconds=extraction_seconds,
+            matching_seconds=matching_seconds,
+            total_seconds=time.perf_counter() - started,
+        )
+        return results[:top], timings
 
 
 def get_sourceafis_engine(request: Request) -> SourceAfisEngine:

@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +9,11 @@ from fastapi.routing import APIRouter
 
 from src.routers import compare, health
 from src.services.sourceafis import SourceAfisEngine
+
+# Uvicorn ne configure que ses propres loggers : sans handler sur la racine,
+# les logs applicatifs n'atteignent jamais la sortie du conteneur. Sortie
+# forcée sur stdout : Cloud Run classe tout ce qui passe par stderr en ERROR.
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
 
 @asynccontextmanager
