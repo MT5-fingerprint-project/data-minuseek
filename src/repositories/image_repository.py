@@ -28,16 +28,20 @@ class GcsImageRepository:
 
     def fetch(self, case_id: str, folder: str, image_id: str) -> tuple[str, bytes] | None:
         """Return (filename, bytes), or None if the object is missing."""
-        base_key = f"media/investigation-case/{case_id}/{folder}/{image_id}"
+        # The back stores the original file extension verbatim (".JPG", ".png", ...)
+        # and GCS object keys are case-sensitive: resolve the object by listing
+        # on the "{id}." prefix instead of guessing from a fixed extension list.
+        prefix = f"media/investigation-case/{case_id}/{folder}/{image_id}."
 
-        for ext in (".png", ".jpg", ".jpeg", ".tiff", ".tif"):
-            blob = self._bucket.blob(f"{base_key}{ext}")
-            try:
-                return (f"{image_id}{ext}", blob.download_as_bytes())
-            except NotFound:
-                continue
-            except Exception as exc:
-                raise ImageStorageError(f"Failed to fetch image {image_id} from case {case_id}/{folder}") from exc
+        try:
+            blob = next(iter(self._bucket.list_blobs(prefix=prefix, max_results=1)), None)
+            if blob is not None:
+                filename = blob.name.rsplit("/", 1)[-1]
+                return (filename, blob.download_as_bytes())
+        except NotFound:
+            pass
+        except Exception as exc:
+            raise ImageStorageError(f"Failed to fetch image {image_id} from case {case_id}/{folder}") from exc
 
         logger.warning("Image %s not found in case %s/%s, skipping it", image_id, case_id, folder)
         return None
