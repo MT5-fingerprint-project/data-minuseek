@@ -25,30 +25,50 @@ class ComparisonFailedError(Exception):
 
 
 def _log_timings(
+    case_id: str,
     trace_id: str,
-    reference_count: int,
-    downloaded_bytes: int,
+    trace_bytes: bytes,
+    reference_images: list[tuple[str, bytes]],
     fetch_seconds: float,
     timings: SearchTimings,
     total_seconds: float,
 ) -> None:
-    extraction_cumulative = sum(timings.extraction_seconds)
+    # Le poids accompagne chaque durée : sans lui on ne peut pas dire si une
+    # extraction lente l'est parce que l'image est grosse ou parce qu'elle est
+    # chargée en texture, et les deux n'appellent pas le même remède.
+    weights = {name.split(".")[0]: len(data) for name, data in reference_images}
+    durations = timings.reference_extraction_seconds
+
+    slowest_reference, slowest_seconds = max(durations, key=lambda entry: entry[1])
+    fastest_reference, fastest_seconds = min(durations, key=lambda entry: entry[1])
+    extraction_cumulative = timings.trace_extraction_seconds + sum(
+        seconds for _, seconds in durations
+    )
+    downloaded_bytes = len(trace_bytes) + sum(weights.values())
     parallelism = (
         extraction_cumulative / timings.total_seconds if timings.total_seconds else 0.0
     )
 
     logger.info(
-        "comparison timings trace=%s references=%d downloaded=%.1fMB fetch=%.1fs "
-        "engine=%.1fs extraction_cumulative=%.1fs extraction_slowest=%.1fs "
-        "extraction_fastest=%.1fs matching=%.3fs parallelism=%.1fx total=%.1fs",
+        "comparison timings case=%s trace=%s references=%d downloaded=%.1fMB fetch=%.1fs "
+        "engine=%.1fs trace_extraction=%.1fs/%.1fMB reference_slowest=%s:%.1fs/%.1fMB "
+        "reference_fastest=%s:%.1fs/%.1fMB extraction_cumulative=%.1fs matching=%.3fs "
+        "parallelism=%.1fx total=%.1fs",
+        case_id,
         trace_id,
-        reference_count,
+        len(durations),
         downloaded_bytes / 1_000_000,
         fetch_seconds,
         timings.total_seconds,
+        timings.trace_extraction_seconds,
+        len(trace_bytes) / 1_000_000,
+        slowest_reference,
+        slowest_seconds,
+        weights[slowest_reference] / 1_000_000,
+        fastest_reference,
+        fastest_seconds,
+        weights[fastest_reference] / 1_000_000,
         extraction_cumulative,
-        max(timings.extraction_seconds),
-        min(timings.extraction_seconds),
         timings.matching_seconds,
         parallelism,
         total_seconds,
@@ -94,9 +114,10 @@ class ComparisonService:
             raise ComparisonFailedError("Could not compare fingerprints") from exc
 
         _log_timings(
+            case_id,
             trace_id,
-            len(references),
-            len(trace_bytes) + sum(len(data) for _, data in references),
+            trace_bytes,
+            references,
             fetch_seconds,
             timings,
             time.perf_counter() - started,

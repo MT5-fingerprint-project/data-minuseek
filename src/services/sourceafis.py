@@ -28,14 +28,19 @@ _template_pool = ThreadPoolExecutor(max_workers=_TEMPLATE_WORKERS)
 class SearchTimings:
     """Durées d'une recherche, pour savoir où porter l'effort d'optimisation.
 
-    `extraction_seconds` est mesuré à l'intérieur des threads du pool : sa somme
+    Trace et empreintes sont séparées parce qu'elles n'appellent pas le même
+    remède : une trace lente se traite au dpi et au cadrage, une empreinte lente
+    se pré-extrait une fois pour toutes au dépôt.
+
+    Les durées sont mesurées à l'intérieur des threads du pool : leur somme
     dépasse `total_seconds` quand les extractions se recouvrent, et le rapport
-    entre les deux donne le parallélisme réellement obtenu. Son maximum est le
-    plancher qu'aucun ajout de vCPU ne fera descendre, une extraction seule
+    entre les deux donne le parallélisme réellement obtenu. La plus longue est
+    le plancher qu'aucun ajout de vCPU ne fera descendre, une extraction seule
     étant mono-thread dans SourceAFIS.
     """
 
-    extraction_seconds: list[float]
+    trace_extraction_seconds: float
+    reference_extraction_seconds: list[tuple[str, float]]
     matching_seconds: float
     total_seconds: float
 
@@ -103,23 +108,25 @@ class SourceAfisEngine:
         trace_template, trace_extraction_seconds = trace_future.result()
         matcher = self._matcher(trace_template)
 
-        extraction_seconds = [trace_extraction_seconds]
+        reference_extraction_seconds = []
         matching_seconds = 0.0
         results = []
         for name, reference_future in reference_futures:
-            reference_template, reference_extraction_seconds = reference_future.result()
-            extraction_seconds.append(reference_extraction_seconds)
+            reference_template, extraction_seconds = reference_future.result()
+            reference_id = name.split(".")[0]
+            reference_extraction_seconds.append((reference_id, extraction_seconds))
 
             matching_started = time.perf_counter()
             score = float(matcher.match(reference_template))
             matching_seconds += time.perf_counter() - matching_started
 
-            results.append({"reference_print": name.split(".")[0], "score": score})
+            results.append({"reference_print": reference_id, "score": score})
 
         results.sort(key=lambda result: result["score"], reverse=True)
 
         timings = SearchTimings(
-            extraction_seconds=extraction_seconds,
+            trace_extraction_seconds=trace_extraction_seconds,
+            reference_extraction_seconds=reference_extraction_seconds,
             matching_seconds=matching_seconds,
             total_seconds=time.perf_counter() - started,
         )
