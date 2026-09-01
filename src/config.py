@@ -7,10 +7,13 @@ APP_VERSION = "0.1.0"
 JARS_DIR = Path(os.environ.get("SOURCEAFIS_JARS_DIR", "/app/build/jars"))
 
 # Version du moteur de comparaison, indépendante d'APP_VERSION : elle change
-# quand SourceAFIS ou son paramétrage change, pas quand le service évolue. Un
-# rapport probant cite cette valeur pour dire quel algorithme a produit un score.
+# quand SourceAFIS ou son paramétrage change, pas quand le service évolue. Le
+# back l'inscrit dans l'acte COMPARISON_EXECUTED de son journal ; le rapport,
+# lui, ne la cite pas. La paramétrisation passe à 2 parce que les images sont
+# désormais extraites à leur propre résolution : les mêmes deux images ne
+# rendent plus le même score qu'avant, et rien d'autre ne distingue les deux.
 SOURCEAFIS_VERSION = "3.17.1"
-ENGINE_PARAMETERIZATION = "1"
+ENGINE_PARAMETERIZATION = "2"
 ENGINE_VERSION = f"sourceafis-{SOURCEAFIS_VERSION}+minuseek.{ENGINE_PARAMETERIZATION}"
 
 
