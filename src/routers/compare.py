@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.config import ENGINE_VERSION
 from src.repositories.image_repository import ImageStorageError
@@ -19,11 +19,21 @@ from src.services.comparison import (
 # au domaine du back (cf. ADR côté back-minuseek).
 router = APIRouter()
 
+# Mêmes bornes que le VO ImageResolution du back, à dessein : une résolution
+# refusée à la saisie ne doit pas redevenir acceptable en arrivant ici.
+Resolution = Annotated[float, Field(ge=50, le=10_000)]
+
+
+class ReferencePrintRef(BaseModel):
+    id: str
+    dpi: Resolution
+
 
 class CompareRequest(BaseModel):
     case_id: str
     trace_id: str
-    reference_print_ids: list[str]
+    trace_dpi: Resolution
+    reference_prints: list[ReferencePrintRef]
     top: int = 20
 
 
@@ -33,7 +43,13 @@ def compare(
     service: Annotated[ComparisonService, Depends(get_comparison_service)],
 ) -> SearchResponse:
     try:
-        results = service.compare(body.case_id, body.trace_id, body.reference_print_ids, body.top)
+        results = service.compare(
+            body.case_id,
+            body.trace_id,
+            body.trace_dpi,
+            [(reference.id, reference.dpi) for reference in body.reference_prints],
+            body.top,
+        )
     except ImageNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
     except ImageStorageError:

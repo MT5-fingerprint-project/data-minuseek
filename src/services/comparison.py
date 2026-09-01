@@ -28,7 +28,7 @@ def _log_timings(
     case_id: str,
     trace_id: str,
     trace_bytes: bytes,
-    reference_images: list[tuple[str, bytes]],
+    reference_images: list[tuple[str, bytes, float]],
     fetch_seconds: float,
     timings: SearchTimings,
     total_seconds: float,
@@ -36,7 +36,7 @@ def _log_timings(
     # Le poids accompagne chaque durée : sans lui on ne peut pas dire si une
     # extraction lente l'est parce que l'image est grosse ou parce qu'elle est
     # chargée en texture, et les deux n'appellent pas le même remède.
-    weights = {name.split(".")[0]: len(data) for name, data in reference_images}
+    weights = {name.split(".")[0]: len(data) for name, data, _ in reference_images}
     durations = timings.reference_extraction_seconds
 
     slowest_reference, slowest_seconds = max(durations, key=lambda entry: entry[1])
@@ -86,7 +86,8 @@ class ComparisonService:
         self,
         case_id: str,
         trace_id: str,
-        reference_print_ids: list[str],
+        trace_dpi: float,
+        reference_prints: list[tuple[str, float]],
         top: int,
     ) -> list[dict]:
         started = time.perf_counter()
@@ -95,11 +96,16 @@ class ComparisonService:
         if trace is None:
             raise ImageNotFoundError(f"Trace {trace_id} not found in case {case_id}")
 
-        references = [
-            image
-            for ref_id in reference_print_ids
-            if (image := self._images.fetch(case_id, "reference-prints", ref_id)) is not None
-        ]
+        # La résolution voyage dans le même tuple que les octets : une empreinte
+        # absente du stockage est retirée ici sans bruit, et deux listes
+        # parallèles se décaleraient d'un cran à partir de là.
+        references: list[tuple[str, bytes, float]] = []
+        for reference_id, dpi in reference_prints:
+            image = self._images.fetch(case_id, "reference-prints", reference_id)
+            if image is not None:
+                filename, data = image
+                references.append((filename, data, dpi))
+
         if not references:
             raise ImageNotFoundError(f"No reference prints found in case {case_id}")
 
@@ -108,7 +114,7 @@ class ComparisonService:
         _, trace_bytes = trace
 
         try:
-            results, timings = self._engine.search(trace_bytes, references, top)
+            results, timings = self._engine.search(trace_bytes, trace_dpi, references, top)
         except Exception as exc:
             logger.exception("Fingerprint comparison failed")
             raise ComparisonFailedError("Could not compare fingerprints") from exc

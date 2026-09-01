@@ -83,7 +83,10 @@ class SourceAfisEngine:
             _TEMPLATE_WORKERS,
         )
 
-    def _make_template(self, image_bytes: bytes, dpi: int) -> tuple[object, float]:
+    def _make_template(self, image_bytes: bytes, dpi: float) -> tuple[object, float]:
+        # SourceAFIS travaille à 500 dpi et redimensionne l'entrée d'un facteur
+        # 500/dpi : déclarer la résolution réelle de l'image est ce qui décide du
+        # coût de l'extraction, pour un template identique.
         started = time.perf_counter()
         options = self._image_options().dpi(dpi)
         template = self._template(self._image(image_bytes, options))
@@ -92,17 +95,17 @@ class SourceAfisEngine:
     def search(
         self,
         trace_bytes: bytes,
-        reference_prints: list[tuple[str, bytes]],
+        trace_dpi: float,
+        reference_prints: list[tuple[str, bytes, float]],
         top: int,
-        dpi: int = 500,
     ) -> tuple[list[dict], SearchTimings]:
         """Compare a trace against many reference prints, best matches first."""
         started = time.perf_counter()
 
-        trace_future = _template_pool.submit(self._make_template, trace_bytes, dpi)
+        trace_future = _template_pool.submit(self._make_template, trace_bytes, trace_dpi)
         reference_futures = [
             (name, _template_pool.submit(self._make_template, data, dpi))
-            for name, data in reference_prints
+            for name, data, dpi in reference_prints
         ]
 
         trace_template, trace_extraction_seconds = trace_future.result()
