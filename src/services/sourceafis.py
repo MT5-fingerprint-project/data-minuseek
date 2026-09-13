@@ -11,6 +11,9 @@ from src.config import JARS_DIR
 
 logger = logging.getLogger(__name__)
 
+# Résolution supposée quand une image n'a pas été calibrée
+DEFAULT_DPI = 500
+
 # Template extraction dominates the cost of a comparison (tens of seconds per
 # high-resolution photo) and is single-threaded inside SourceAFIS, so the
 # engine extracts the trace and reference templates concurrently in the JVM
@@ -87,17 +90,22 @@ class SourceAfisEngine:
     def search(
         self,
         trace_bytes: bytes,
-        reference_prints: list[tuple[str, bytes]],
+        reference_prints: list[tuple[str, bytes, float]],
         top: int,
-        dpi: int = 500,
+        trace_dpi: float,
     ) -> tuple[list[dict], SearchTimings]:
-        """Compare a trace against many reference prints, best matches first."""
+        """Compare a trace against many reference prints, best matches first.
+
+        SourceAFIS n'est pas invariant à l'échelle : chaque image porte son
+        propre DPI (mesuré par calibration) pour que le moteur ramène toutes
+        les crêtes à une période comparable.
+        """
         started = time.perf_counter()
 
-        trace_future = _template_pool.submit(self._make_template, trace_bytes, dpi)
+        trace_future = _template_pool.submit(self._make_template, trace_bytes, trace_dpi)
         reference_futures = [
             (name, _template_pool.submit(self._make_template, data, dpi))
-            for name, data in reference_prints
+            for name, data, dpi in reference_prints
         ]
 
         trace_template, trace_extraction_seconds = trace_future.result()

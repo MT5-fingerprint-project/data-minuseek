@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -25,6 +25,9 @@ class CompareRequest(BaseModel):
     trace_id: str
     reference_print_ids: list[str]
     top: int = 20
+    # DPI mesurés par calibration côté back ; None/absent = image non calibrée.
+    trace_dpi: Optional[float] = None
+    reference_print_dpis: Dict[str, Optional[float]] = {}
 
 
 @router.post("/compare")
@@ -33,7 +36,14 @@ def compare(
     service: Annotated[ComparisonService, Depends(get_comparison_service)],
 ) -> SearchResponse:
     try:
-        results = service.compare(body.case_id, body.trace_id, body.reference_print_ids, body.top)
+        results = service.compare(
+            body.case_id,
+            body.trace_id,
+            body.reference_print_ids,
+            body.top,
+            trace_dpi=body.trace_dpi,
+            reference_print_dpis=body.reference_print_dpis,
+        )
     except ImageNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from None
     except ImageStorageError:
