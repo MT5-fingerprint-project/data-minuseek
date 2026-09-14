@@ -8,6 +8,7 @@ from fastapi import Depends
 
 from src.repositories.image_repository import GcsImageRepository, get_image_repository
 from src.services.sourceafis import (
+    DEFAULT_DPI,
     SearchTimings,
     SourceAfisEngine,
     get_sourceafis_engine,
@@ -68,6 +69,8 @@ class ComparisonService:
         trace_id: str,
         reference_print_ids: list[str],
         top: int,
+        trace_dpi: float | None = None,
+        reference_print_dpis: dict[str, float | None] | None = None,
     ) -> list[dict]:
         started = time.perf_counter()
 
@@ -75,8 +78,9 @@ class ComparisonService:
         if trace is None:
             raise ImageNotFoundError(f"Trace {trace_id} not found in case {case_id}")
 
+        dpis = reference_print_dpis or {}
         references = [
-            image
+            (image[0], image[1], dpis.get(ref_id) or DEFAULT_DPI)
             for ref_id in reference_print_ids
             if (image := self._images.fetch(case_id, "reference-prints", ref_id)) is not None
         ]
@@ -88,7 +92,9 @@ class ComparisonService:
         _, trace_bytes = trace
 
         try:
-            results, timings = self._engine.search(trace_bytes, references, top)
+            results, timings = self._engine.search(
+                trace_bytes, references, top, trace_dpi or DEFAULT_DPI
+            )
         except Exception as exc:
             logger.exception("Fingerprint comparison failed")
             raise ComparisonFailedError("Could not compare fingerprints") from exc
@@ -96,7 +102,7 @@ class ComparisonService:
         _log_timings(
             trace_id,
             len(references),
-            len(trace_bytes) + sum(len(data) for _, data in references),
+            len(trace_bytes) + sum(len(data) for _, data, _dpi in references),
             fetch_seconds,
             timings,
             time.perf_counter() - started,
