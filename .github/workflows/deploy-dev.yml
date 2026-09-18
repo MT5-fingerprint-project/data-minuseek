@@ -10,8 +10,8 @@ concurrency: deploy-dev
 
 env:
   REGION: europe-west1
-  PROJECT: dev-minuseek
-  AR: europe-west1-docker.pkg.dev/dev-minuseek/minuseek
+  PROJECT: minuseek-dev
+  AR: europe-west1-docker.pkg.dev/minuseek-dev/minuseek
 
 jobs:
   deploy:

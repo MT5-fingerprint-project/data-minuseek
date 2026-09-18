@@ -12,9 +12,9 @@ concurrency: deploy-prod
 
 env:
   REGION: europe-west1
-  PROJECT: prod-minuseek
-  AR_DEV: europe-west1-docker.pkg.dev/dev-minuseek/minuseek
-  AR_PROD: europe-west1-docker.pkg.dev/prod-minuseek/minuseek
+  PROJECT: minuseek-prod
+  AR_DEV: europe-west1-docker.pkg.dev/minuseek-dev/minuseek
+  AR_PROD: europe-west1-docker.pkg.dev/minuseek-prod/minuseek
 
 jobs:
   promote:
